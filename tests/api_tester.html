@@ -643,21 +643,31 @@
         });
 
         async function sendRequest(endpoint, file, params = '') {
-            const formData = new FormData();
-            formData.append('file', file);
+    const formData = new FormData();
+    formData.append('file', file);
 
-            try {
-                const response = await fetch(`${API_URL}${endpoint}${params}`, {
-                    method: 'POST',
-                    body: formData,
-                    mode: 'cors'
-                });
+    try {
+        const response = await fetch(`${API_URL}${endpoint}${params}`, {
+            method: 'POST',
+            body: formData,
+            mode: 'cors'
+        });
 
-                return await response.json();
-            } catch (error) {
-                return { error: error.message };
+        // Check for HTTP 400
+        if (!response.ok) {
+            if (response.status === 400) {
+                alert("Invalid file format! Please upload a proper image format (JPEG, PNG, etc.)");
             }
+            return { error: `HTTP ${response.status}: ${response.statusText}` };
         }
+
+        return await response.json();
+    } catch (error) {
+        alert("⚠️ Something went wrong! " + error.message);
+        return { error: error.message };
+    }
+}
+
 
         function createDownloadButton(url, filename) {
             const btn = document.createElement('button');

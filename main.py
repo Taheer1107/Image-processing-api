@@ -53,11 +53,15 @@ class ImageAnalyzer:
     
     @staticmethod
     def calculate_blur_score(image: np.ndarray) -> float:
-        """Calculate blur detection score (0-100)"""
+        """Calculate blur detection score (0-100).
+
+        This method returns a sharpness-like percentage (higher == sharper).
+        The API layer may invert this for a user-facing "blur" percentage.
+        """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-        blur_score = min(100, (laplacian_var / 500) * 100)
-        return round(blur_score, 2)
+        sharpness_pct = min(100, (laplacian_var / 500) * 100)
+        return round(sharpness_pct, 2)
     
     @staticmethod
     def calculate_brightness(image: np.ndarray) -> float:
@@ -77,9 +81,26 @@ class ImageAnalyzer:
     def count_objects(image: np.ndarray) -> int:
         """Detect and count objects in image"""
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # Use Otsu's method for automatic threshold selection
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Apply morphological operations to clean up the binary image
+        kernel = np.ones((3, 3), np.uint8)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        # Find contours
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return len(contours)
+
+        # Filter contours by area to remove noise
+        min_area = 100  # Minimum contour area to be considered an object
+        filtered_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_area]
+
+        return len(filtered_contours)
     
     @staticmethod
     def enhance_image(image: np.ndarray) -> np.ndarray:
@@ -239,11 +260,19 @@ async def analyze_image(file: UploadFile = File(...)):
         content = await file.read()
         image = ImageAnalyzer.read_image(content)
         
-        blur_score = ImageAnalyzer.calculate_blur_score(image)
+        # `calculate_blur_score` returns a sharpness-like percentage
+        # (higher == sharper). For the API we present a user-friendly
+        # "blur" percentage (higher == more blurred) so invert it.
+        sharpness = ImageAnalyzer.calculate_blur_score(image)
         brightness = ImageAnalyzer.calculate_brightness(image)
         contrast = ImageAnalyzer.calculate_contrast(image)
         object_count = ImageAnalyzer.count_objects(image)
-        rating = ImageAnalyzer.get_quality_rating(blur_score, brightness, contrast)
+
+        # Presented blur score: higher means more blurred
+        blur_score = round(max(0.0, 100.0 - sharpness), 2)
+
+        # Keep rating/recommendations based on internal sharpness metric
+        rating = ImageAnalyzer.get_quality_rating(sharpness, brightness, contrast)
         
         return {
             "filename": file.filename,
@@ -260,7 +289,7 @@ async def analyze_image(file: UploadFile = File(...)):
                 "object_count": object_count,
                 "quality_rating": rating
             },
-            "recommendations": generate_recommendations(blur_score, brightness, contrast)
+            "recommendations": generate_recommendations(sharpness, brightness, contrast)
         }
     
     except ValueError as e:
