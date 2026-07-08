@@ -4,7 +4,7 @@ Quality analysis + Image transformations (resize, crop, filters)
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
@@ -230,8 +230,29 @@ def generate_recommendations(blur: float, brightness: float, contrast: float) ->
 
 @app.get("/", include_in_schema=False)
 async def root():
-    """Redirect browser users to the interactive API documentation."""
-    return RedirectResponse(url="/docs", status_code=307)
+    """Return API information and documentation links."""
+    return {
+        "message": "Smart Image Processing API v2.0",
+        "version": "2.0.0",
+        "documentation": {
+            "swagger": "/docs",
+            "redoc": "/redoc"
+        },
+        "endpoints": {
+            "Analysis": [
+                "/analyze - Analyze image quality",
+                "/enhance - Enhance and analyze image",
+                "/batch-analyze - Analyze multiple images"
+            ],
+            "Transformations": [
+                "/resize - Resize image",
+                "/crop - Crop image",
+                "/filter - Apply filters (blur, sharpen, edge, smooth, grayscale, sepia)",
+                "/rotate - Rotate image",
+                "/flip - Flip image"
+            ]
+        }
+    }
 
 
 # ==================== ANALYSIS ENDPOINTS ====================
