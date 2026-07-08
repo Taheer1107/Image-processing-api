@@ -1,13 +1,28 @@
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: imageprocessingapi-uploads-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
 kind: Pod
-
 metadata:
   name: imageprocessingapi
-
 spec:
+  volumes:
+    - name: imageprocessingapi-uploads
+      persistentVolumeClaim:
+        claimName: imageprocessingapi-uploads-pvc
   containers:
-  - name: imageprocessingapi
-    image: image_processing_api:latest
-    imagePullPolicy: Never
-    ports:
-    - containerPort: 5000
+    - name: imageprocessingapi
+      image: mohamedtaheer/imageprocessingapi:18
+      ports:
+        - containerPort: 5000
+      volumeMounts:
+        - name: imageprocessingapi-uploads
+          mountPath: /IMAGE-PROCESSING-API/uploads
