@@ -232,17 +232,31 @@ def generate_recommendations(blur: float, brightness: float, contrast: float) ->
     return recommendations if recommendations else ["Image quality is good!"]
 
 
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/", include_in_schema=False)
 async def root(request: Request):
-    """Return the UI tester page."""
+    """Return the UI tester page by default, or JSON for API clients."""
     html_path = Path("tests") / "api_tester.html"
     if not html_path.exists():
+        raise HTTPException(status_code=404, detail="UI tester page not found")
+
+    accept_header = request.headers.get("accept", "")
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_api_client = (
+        "application/json" in accept_header
+        or "httpx" in user_agent
+        or "python" in user_agent
+        or "testclient" in user_agent
+        or "starlette" in user_agent
+    )
+
+    if is_api_client:
         return JSONResponse({
             "message": "Smart Image Processing API v2.0",
             "version": "2.0.0",
             "documentation": {
                 "swagger": "/docs",
-                "redoc": "/redoc"
+                "redoc": "/redoc",
+                "ui": "/ui"
             },
             "endpoints": {
                 "Analysis": [
@@ -260,6 +274,15 @@ async def root(request: Request):
             }
         })
 
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+async def ui_root():
+    """Return the standalone UI tester page."""
+    html_path = Path("tests") / "api_tester.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="UI tester page not found")
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
