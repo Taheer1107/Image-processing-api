@@ -3,9 +3,10 @@ Smart Image Processing API - Enhanced with Transformations
 Quality analysis + Image transformations (resize, crop, filters)
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
@@ -37,6 +38,9 @@ app.add_middleware(
 # Create uploads directory
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Mount UI tester static file directory
+app.mount("/ui", StaticFiles(directory="tests"), name="ui")
 
 
 class ImageAnalyzer:
@@ -228,31 +232,35 @@ def generate_recommendations(blur: float, brightness: float, contrast: float) ->
     return recommendations if recommendations else ["Image quality is good!"]
 
 
-@app.get("/", include_in_schema=False)
-async def root():
-    """Return API information and documentation links."""
-    return {
-        "message": "Smart Image Processing API v2.0",
-        "version": "2.0.0",
-        "documentation": {
-            "swagger": "/docs",
-            "redoc": "/redoc"
-        },
-        "endpoints": {
-            "Analysis": [
-                "/analyze - Analyze image quality",
-                "/enhance - Enhance and analyze image",
-                "/batch-analyze - Analyze multiple images"
-            ],
-            "Transformations": [
-                "/resize - Resize image",
-                "/crop - Crop image",
-                "/filter - Apply filters (blur, sharpen, edge, smooth, grayscale, sepia)",
-                "/rotate - Rotate image",
-                "/flip - Flip image"
-            ]
-        }
-    }
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root(request: Request):
+    """Return the UI tester page."""
+    html_path = Path("tests") / "api_tester.html"
+    if not html_path.exists():
+        return JSONResponse({
+            "message": "Smart Image Processing API v2.0",
+            "version": "2.0.0",
+            "documentation": {
+                "swagger": "/docs",
+                "redoc": "/redoc"
+            },
+            "endpoints": {
+                "Analysis": [
+                    "/analyze - Analyze image quality",
+                    "/enhance - Enhance and analyze image",
+                    "/batch-analyze - Analyze multiple images"
+                ],
+                "Transformations": [
+                    "/resize - Resize image",
+                    "/crop - Crop image",
+                    "/filter - Apply filters (blur, sharpen, edge, smooth, grayscale, sepia)",
+                    "/rotate - Rotate image",
+                    "/flip - Flip image"
+                ]
+            }
+        })
+
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
 # ==================== ANALYSIS ENDPOINTS ====================
